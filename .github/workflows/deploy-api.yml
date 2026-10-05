@@ -41,7 +41,7 @@ jobs:
           docker push "${IMAGE_BASE}:${GITHUB_SHA}"
 
       - name: 部署 Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
+        uses: google-github-actions/deploy-cloudrun@v3
         with:
           service: citadel-api
           image: "${IMAGE_BASE}:${GITHUB_SHA}"

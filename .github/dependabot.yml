@@ -1,5 +1,7 @@
 version: 2
 updates:
+  # 云资源（GCP/Vercel）与流水线调优期间：忽略所有跨大版本升级，仅接受 minor/patch 分组更新，
+  # 避免 eslint 10 / typescript 7 / actions v7 等破坏性 PR 噪音。恢复方法：删除各 ignore 段。
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -7,6 +9,8 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 
@@ -17,6 +21,8 @@ updates:
     groups:
       maven-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 
@@ -27,5 +33,7 @@ updates:
     groups:
       actions-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      - update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(ci)"

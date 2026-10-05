@@ -48,6 +48,9 @@ citadel:
     secret: ${JWT_SECRET:}
     access-ttl-seconds: 900
     refresh-ttl-days: 7
+  security:
+    # 生产置 true（application-prod.yml 覆盖）：强制 HTTPS，密码等敏感字段只在 TLS 上传输
+    require-https: ${CITADEL_SECURITY_REQUIREHTTPS:false}
 
 logging:
   level:

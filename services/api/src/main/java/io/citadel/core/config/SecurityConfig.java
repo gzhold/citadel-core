@@ -65,6 +65,11 @@ public class SecurityConfig {
     return registration;
   }
 
+  /** 嵌套配置缺失时兜底为 false（application.yml 已有默认值，此处双保险防 NPE）。 */
+  private static boolean requireHttps(CitadelProperties properties) {
+    return properties.security() != null && properties.security().requireHttps();
+  }
+
   @Bean
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
@@ -80,7 +85,7 @@ public class SecurityConfig {
         // 重定向到 HTTPS；密码等敏感字段因此只会在 TLS 加密通道中传输。本地开发允许 loopback HTTP
         .requiresChannel(
             rc -> {
-              if (properties.security().requireHttps()) {
+              if (requireHttps(properties)) {
                 rc.anyRequest().requiresSecure();
               }
             })

@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+target/
+coverage/
+pnpm-lock.yaml
+services/
+docker/
+docs/
+.husky/_/
+Makefile
+*.md

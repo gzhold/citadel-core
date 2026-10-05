@@ -1,0 +1,42 @@
+name: api-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api-ci.yml"
+  pull_request:
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api-ci.yml"
+
+jobs:
+  verify:
+    name: format + unit + integration + package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Spotless 格式检查
+        run: ./mvnw -B spotless:check
+
+      # 单元测试（无需 Docker）+ Testcontainers 集成测试（GH runner 自带 Docker）+ 打包
+      - name: Verify（unit + integration + package）
+        run: ./mvnw -B verify -Pintegration
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: citadel-api-jar
+          path: services/api/target/citadel-api.jar
+          retention-days: 7

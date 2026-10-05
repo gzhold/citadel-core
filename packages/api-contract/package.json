@@ -1,0 +1,11 @@
+{
+  "name": "@citadel/api-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "前后端共享 API 契约：zod schema 与类型（Next.js 通过 transpilePackages 直接消费 TS 源码）",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

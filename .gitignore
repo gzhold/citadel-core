@@ -1,0 +1,27 @@
+# --- dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- builds ---
+dist/
+.next/
+out/
+target/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- env & secrets（.env.example 例外，必须入库）---
+.env
+.env.*
+!.env.example
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+.DS_Store
+*.log
+logs/
+
+# --- tests / coverage ---
+coverage/
+jacoco.exec

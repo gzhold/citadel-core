@@ -1,0 +1,9 @@
+# QA 环境（Cloud Run / 测试部署）
+logging:
+  level:
+    io.citadel: DEBUG
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized

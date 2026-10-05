@@ -1,0 +1,17 @@
+# 生产环境：关闭 API 文档、收敛日志与暴露面
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: WARN
+    io.citadel: INFO

@@ -1,0 +1,66 @@
+# 手动部署 citadel-api 到 Google Cloud Run（免费额度区域 us-central1）
+# 前置条件与一次性配置见 docs/runbook.md（WIF、Secret Manager、Artifact Registry）
+name: deploy-api
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE: citadel-api
+  IMAGE_BASE: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/citadel/citadel-api
+
+jobs:
+  build-and-deploy:
+    name: build → push → deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Google 认证（WIF，无长期密钥）
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: 安装 gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 构建镜像
+        run: docker build -t "${IMAGE_BASE}:${GITHUB_SHA}" services/api
+
+      - name: 推送 Artifact Registry
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev"
+          docker push "${IMAGE_BASE}:${GITHUB_SHA}"
+
+      - name: 部署 Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: citadel-api
+          image: "${IMAGE_BASE}:${GITHUB_SHA}"
+          region: us-central1
+          flags: >-
+            --cpu=1
+            --memory=512Mi
+            --min-instances=0
+            --max-instances=2
+            --timeout=300
+            --allow-unauthenticated
+            --set-env-vars=SPRING_PROFILES_ACTIVE=prod
+            --set-secrets=DATABASE_URL=citadel-db-url:latest,DATABASE_USERNAME=citadel-db-user:latest,DATABASE_PASSWORD=citadel-db-pass:latest,JWT_SECRET=citadel-jwt-secret:latest,CORS_ALLOWED_ORIGINS=citadel-cors-origins:latest
+
+      - name: 部署后健康检查
+        run: |
+          url=$(gcloud run services describe citadel-api --region us-central1 --format 'value(status.url)')
+          for i in $(seq 1 12); do
+            if curl -fsS "${url}/actuator/health" | grep -q '"UP"'; then echo "healthy"; exit 0; fi
+            echo "waiting... ${i}"; sleep 10
+          done
+          echo "service did not become healthy" && exit 1

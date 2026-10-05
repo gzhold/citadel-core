@@ -21,6 +21,7 @@ class JwtServiceTest {
     return new CitadelProperties(
         new CitadelProperties.Cors(List.of("http://localhost:3000")),
         new CitadelProperties.Jwt(secret, ttlSeconds, 7),
+        new CitadelProperties.Security(false),
         "Citadel");
   }
 

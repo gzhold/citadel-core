@@ -15,3 +15,12 @@ logging:
   level:
     root: WARN
     io.citadel: INFO
+
+# 传输安全：生产仅接受 HTTPS。Cloud Run 负载均衡注入 X-Forwarded-Proto: https，
+# forward-headers-strategy=framework 让 Spring 采信该头；直连 HTTP 会被 302 到 HTTPS。
+server:
+  forward-headers-strategy: framework
+
+citadel:
+  security:
+    require-https: true

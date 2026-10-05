@@ -53,6 +53,7 @@ class AuthServiceImplTest {
       new CitadelProperties(
           new CitadelProperties.Cors(List.of("http://localhost:3000")),
           new CitadelProperties.Jwt("unit-test-secret-0123456789abcdef0123456789", 900, 7),
+          new CitadelProperties.Security(false),
           "Citadel");
 
   @Mock private UserRepository userRepository;

@@ -67,12 +67,28 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, JwtAuthenticationFilter jwtFilter, RestAuthenticationEntryPoint entryPoint)
+      HttpSecurity http,
+      JwtAuthenticationFilter jwtFilter,
+      RestAuthenticationEntryPoint entryPoint,
+      CitadelProperties properties)
       throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
         // 按名称解析 corsConfigurationSource Bean：容器内还有 MvcHandlerMappingIntrospector
         // 同样实现了 CorsConfigurationSource，按类型注入会产生歧义
         .cors(Customizer.withDefaults())
+        // 传输安全：prod（requireHttps=true）强制 HTTPS 通道，直连 HTTP 由 Spring Security 302
+        // 重定向到 HTTPS；密码等敏感字段因此只会在 TLS 加密通道中传输。本地开发允许 loopback HTTP
+        .requiresChannel(
+            rc -> {
+              if (properties.security().requireHttps()) {
+                rc.anyRequest().requiresSecure();
+              }
+            })
+        // HSTS：仅在 HTTPS 响应上生效（浏览器忽略 HTTP 响应上的该头），本地开发零副作用
+        .headers(
+            h ->
+                h.httpStrictTransportSecurity(
+                    hsts -> hsts.maxAgeInSeconds(31536000).includeSubDomains(true)))
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth -> auth.requestMatchers(PUBLIC_PATHS).permitAll().anyRequest().authenticated())

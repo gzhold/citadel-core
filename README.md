@@ -2,11 +2,9 @@
 
 > B2B 多租户团队协作平台 —— 个人作品集项目，与任何同名公司或组织无关。
 
-[![web-ci](https://github.com/gaozhao/citadel-core/actions/workflows/web-ci.yml/badge.svg)](./.github/workflows/web-ci.yml)
-[![api-ci](https://github.com/gaozhao/citadel-core/actions/workflows/api-ci.yml/badge.svg)](./.github/workflows/api-ci.yml)
-[![codeql](https://github.com/gaozhao/citadel-core/actions/workflows/codeql.yml/badge.svg)](./.github/workflows/codeql.yml)
-
-> badge 中的 owner/仓库名推送 GitHub 后按实际地址替换。
+[![web-ci](https://github.com/gzhold/citadel-core/actions/workflows/web-ci.yml/badge.svg)](./.github/workflows/web-ci.yml)
+[![api-ci](https://github.com/gzhold/citadel-core/actions/workflows/api-ci.yml/badge.svg)](./.github/workflows/api-ci.yml)
+[![codeql](https://github.com/gzhold/citadel-core/actions/workflows/codeql.yml/badge.svg)](./.github/workflows/codeql.yml)
 
 ## 这是什么
 

@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -66,13 +67,12 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http,
-      JwtAuthenticationFilter jwtFilter,
-      RestAuthenticationEntryPoint entryPoint,
-      CorsConfigurationSource corsSource)
+      HttpSecurity http, JwtAuthenticationFilter jwtFilter, RestAuthenticationEntryPoint entryPoint)
       throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsSource))
+        // 按名称解析 corsConfigurationSource Bean：容器内还有 MvcHandlerMappingIntrospector
+        // 同样实现了 CorsConfigurationSource，按类型注入会产生歧义
+        .cors(Customizer.withDefaults())
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth -> auth.requestMatchers(PUBLIC_PATHS).permitAll().anyRequest().authenticated())

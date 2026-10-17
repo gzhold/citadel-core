@@ -2,6 +2,8 @@
 
 Citadel 前端：Next.js 15（App Router）+ TypeScript strict + Tailwind CSS 4。
 
+> **线上演示**：<https://citadel-web-jphzpd7pxa-uc.a.run.app>（Cloud Run 免费档，首次访问冷启动约 2–3 秒；演示账号 `prod-verify@citadel.local` / `password123`）
+
 ## 常用命令（在仓库根目录）
 
 ```bash

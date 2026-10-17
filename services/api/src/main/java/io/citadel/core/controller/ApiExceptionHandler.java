@@ -10,9 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 全局异常 → 统一错误体。不向客户端泄露堆栈与内部信息。 */
 @RestControllerAdvice
@@ -45,6 +47,20 @@ public class ApiExceptionHandler {
     log.warn("数据完整性冲突: {}", ex.getMostSpecificCause().getMessage());
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(new ErrorResponse("CONFLICT", "数据冲突，请检查唯一性字段", Instant.now()));
+  }
+
+  /** 请求体不可读/类型不匹配（如 password 传了字符串而信封要求对象）→ 400，不泄露解析细节。 */
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex) {
+    return ResponseEntity.badRequest()
+        .body(new ErrorResponse("REQUEST_BODY_INVALID", "请求体格式非法", Instant.now()));
+  }
+
+  /** 未知路径 → 404（默认会落入兜底 500，语义错误）。 */
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException ex) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(new ErrorResponse("NOT_FOUND", "接口不存在", Instant.now()));
   }
 
   @ExceptionHandler(Exception.class)

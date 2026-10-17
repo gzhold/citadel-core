@@ -273,3 +273,15 @@ flowchart LR
 3. **Dependabot 大版本 PR 已在源头静默**（`.github/dependabot.yml` ignore 段）；已存在的大版本 PR 浏览器手动关闭即可。
 4. **恢复大版本更新**：删除 dependabot.yml 中三个 ignore 段即可。
 5. **可选项**：`smoke` 环境（Neon dev 分支 4 个 Secrets）+ Vercel 自定义域名 + 生产库账号权限收敛（runbook §7）。
+
+---
+
+## 追加：应用层密码信封加密（2026-10-17）
+
+**需求**：登录/注册接口的密码不得以明文出现在请求体（等保类检查项）。
+
+**方案**：RSA-OAEP(SHA-256) 包裹 AES-256-GCM 会话密钥的混合信封。服务端每实例持有内存态 2048 位密钥对（重启即轮换），`GET /api/v1/auth/crypto/key` 下发公钥（SPKI/Base64）；前端用 WebCrypto 加密，与 JCA 服务端逐位互通。多实例 keyId 不匹配返回 `CRYPTO_KEY_UNKNOWN`，客户端重取公钥重试一次（幂等）。
+
+**威胁模型（诚实边界，写进了代码注释）**：公钥经 TLS 分发，故本机制不防御能攻破 TLS 的中间人；传输机密性仍以 TLS（生产强制 HTTPS + HSTS）为基础。真实增量：密码明文不出现在请求体日志、TLS 卸载的 WAF/企业代理中；篡改被 GCM 完整性校验拒绝（`PASSWORD_DECRYPT_FAILED`）；明文直发旧客户端行为被 DTO 校验拒绝（`REQUEST_BODY_INVALID`）。
+
+**验证**（生产环境实测）：取公钥 → 信封登录 200；篡改密文 400；明文直发 400；后端单测 15/15（新增往返/轮换/篡改 3 例），集成测试全链路改走"取钥→加密→提交"。

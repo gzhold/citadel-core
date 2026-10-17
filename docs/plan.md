@@ -266,9 +266,10 @@ flowchart LR
 
 ---
 
-## 待办（2026-10-05 暂停流水线时记录）
+## 待办（2026-10-05 记录，2026-10-17 更新）
 
-1. **api-ci 在 main 上失败（与 GCP 无关，是集成测试问题）**：本机无 Docker，`AuthFlowIT` 从未真实运行过；GitHub runner 上 `Verify（unit + integration + package）` 步骤失败。web-ci 与 codeql 均绿。诊断路径：打开 https://github.com/gzhold/citadel-core/actions 的 api-ci 失败 run 看日志（API 匿名限流，日志需登录浏览器查看）。
-2. **GCP 配置后恢复部署**：按 runbook §2 完成 WIF/AR/Secret Manager 后，手动触发 deploy-api（`workflow_dispatch`，无需代码改动）。
-3. **Dependabot 大版本 PR 已在源头静默**（`.github/dependabot.yml` ignore 段）；已存在的 6 个大版本 PR 需在浏览器手动关闭。
+1. ~~api-ci 在 main 上失败~~ **已定位并修复（2026-10-17）**：`AuthFlowIT` 首次在 CI 真实运行，暴露 `refresh()` 重放检测的安全吊销随 `ApiException` 事务回滚丢失的经典 bug——修复为 `@Transactional(noRollbackFor = ApiException.class)`（login 的失败审计同理）。教训：**涉及"安全簿记 + 业务拒绝"的方法必须显式声明 noRollbackFor**；本机无 Docker 导致集成测试长期未真实执行，掩盖了问题。
+2. ~~GCP 配置后恢复部署~~ **已完成（2026-10-17）**：WIF/AR/Secret Manager/双 SA 全部就绪（agent 经设备授权代操作）；deploy-api/deploy-web 改为 push 自动触发并显式绑定 `citadel-runtime` 运行身份（默认 compute SA 无 actAs 授权，属预期最小权限）。前端由 Cloud Run 承载（原计划的 Vercel 作为可选替代，绑自定义域名时可切换）。
+3. **Dependabot 大版本 PR 已在源头静默**（`.github/dependabot.yml` ignore 段）；已存在的大版本 PR 浏览器手动关闭即可。
 4. **恢复大版本更新**：删除 dependabot.yml 中三个 ignore 段即可。
+5. **可选项**：`smoke` 环境（Neon dev 分支 4 个 Secrets）+ Vercel 自定义域名 + 生产库账号权限收敛（runbook §7）。

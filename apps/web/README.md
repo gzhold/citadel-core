@@ -24,3 +24,14 @@ pnpm --filter @citadel/web build
 - `src/app/(auth)/` — 登录/注册（公开路由组）
 - `src/app/(app)/` — 受保护路由组（布局级守卫 + `/dashboard`）
 - 契约位于 `packages/api-contract`（zod schema 前后端共用）
+
+## 部署（Cloud Run）
+
+合入 `main` 且本目录或 `packages/api-contract` 有变更时，`deploy-web` 工作流自动：
+
+1. 从 Cloud Run 读取 `citadel-api` 服务地址（等待其先部署完成）；
+2. 以该地址为 `NEXT_PUBLIC_API_BASE_URL` build arg 构建镜像（`NEXT_PUBLIC_*` 构建期内联，运行期不可改）；
+3. 推送 Artifact Registry 并部署为 `citadel-web` 服务（缩容到 0，免费额度内）。
+
+前端域名变化后需更新后端 CORS（Secret Manager 的 `citadel-cors-origins`）并滚动重启 `citadel-api`。
+

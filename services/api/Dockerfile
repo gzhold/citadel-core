@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# ---- 构建阶段：Maven + JDK 21，产出分层 jar ----
+# ---- 构建阶段：Maven + JDK 21，产出可执行 jar ----
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /workspace
 
@@ -9,10 +9,11 @@ COPY mvnw pom.xml ./
 RUN ./mvnw -q -DskipTests dependency:go-offline
 
 COPY src/ src/
-RUN ./mvnw -q -DskipTests package \
-  && java -Djarmode=tools -jar target/citadel-api.jar extract --layers --destination extracted
+RUN ./mvnw -q -DskipTests package
 
 # ---- 运行阶段：JRE 21 + 非 root 用户 ----
+# 说明：曾尝试 Boot 3.3+ 的 `jarmode=tools extract --layers` 分层运行，但该模式输出布局
+# 与启动类路径不匹配导致 JarClassLoader 缺失；直接运行可执行 jar 最稳妥（层缓存损失可忽略）。
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl \
@@ -20,10 +21,7 @@ RUN apt-get update \
   && groupadd --system citadel && useradd --system --gid citadel citadel
 
 WORKDIR /app
-COPY --from=build /workspace/extracted/dependencies/ ./
-COPY --from=build /workspace/extracted/spring-boot-loader/ ./
-COPY --from=build /workspace/extracted/snapshot-dependencies/ ./
-COPY --from=build /workspace/extracted/application/ ./
+COPY --from=build /workspace/target/citadel-api.jar app.jar
 
 USER citadel
 EXPOSE 8080
@@ -32,4 +30,4 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
   CMD curl -fsS http://127.0.0.1:8080/actuator/health | grep -q '"UP"' || exit 1
 
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

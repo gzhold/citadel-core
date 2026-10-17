@@ -1,12 +1,15 @@
 package io.citadel.core.controller;
 
 import io.citadel.core.dto.AuthResponse;
+import io.citadel.core.dto.CryptoKeyResponse;
 import io.citadel.core.dto.LoginRequest;
 import io.citadel.core.dto.RefreshRequest;
 import io.citadel.core.dto.RegisterRequest;
+import io.citadel.core.security.AuthCryptoService;
 import io.citadel.core.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,9 +21,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthService authService;
+  private final AuthCryptoService authCryptoService;
 
-  public AuthController(AuthService authService) {
+  public AuthController(AuthService authService, AuthCryptoService authCryptoService) {
     this.authService = authService;
+    this.authCryptoService = authCryptoService;
+  }
+
+  /** 客户端用它加密登录/注册的密码信封；keyId 轮换后客户端应重取并重试一次。 */
+  @GetMapping("/crypto/key")
+  public CryptoKeyResponse cryptoKey() {
+    return authCryptoService.publicKeyResponse();
   }
 
   /** 注册即建租户：同一事务内创建用户、默认工作区与 OWNER 成员关系。 */

@@ -23,6 +23,7 @@ import io.citadel.core.repository.RefreshTokenRepository;
 import io.citadel.core.repository.UserRepository;
 import io.citadel.core.repository.WorkspaceMemberRepository;
 import io.citadel.core.repository.WorkspaceRepository;
+import io.citadel.core.security.AuthCryptoService;
 import io.citadel.core.security.JwtService;
 import io.citadel.core.service.AuthService;
 import java.security.SecureRandom;
@@ -57,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
   private final JwtService jwtService;
   private final AuditEventPublisher auditPublisher;
   private final CitadelProperties properties;
+  private final AuthCryptoService authCryptoService;
 
   public AuthServiceImpl(
       UserRepository userRepository,
@@ -66,7 +68,8 @@ public class AuthServiceImpl implements AuthService {
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
       AuditEventPublisher auditPublisher,
-      CitadelProperties properties) {
+      CitadelProperties properties,
+      AuthCryptoService authCryptoService) {
     this.userRepository = userRepository;
     this.workspaceRepository = workspaceRepository;
     this.workspaceMemberRepository = workspaceMemberRepository;
@@ -75,12 +78,17 @@ public class AuthServiceImpl implements AuthService {
     this.jwtService = jwtService;
     this.auditPublisher = auditPublisher;
     this.properties = properties;
+    this.authCryptoService = authCryptoService;
   }
 
   @Override
   @Transactional
   public AuthResponse register(RegisterRequest request) {
     String email = request.email().trim().toLowerCase(Locale.ROOT);
+    String password = authCryptoService.decryptPassword(request.password());
+    if (password.length() < 8 || password.length() > 72) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_POLICY", "密码至少 8 位，最长 72 位");
+    }
     if (userRepository.existsByEmailIgnoreCase(email)) {
       throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_USED", "该邮箱已被注册");
     }
@@ -89,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(
             User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(request.password()))
+                .passwordHash(passwordEncoder.encode(password))
                 .displayName(request.displayName().trim())
                 .build());
 
@@ -128,17 +136,18 @@ public class AuthServiceImpl implements AuthService {
   @Transactional(noRollbackFor = ApiException.class)
   public AuthResponse login(LoginRequest request) {
     String email = request.email().trim().toLowerCase(Locale.ROOT);
+    String password = authCryptoService.decryptPassword(request.password());
     User user =
         userRepository
             .findByEmailIgnoreCase(email)
             .orElseThrow(
                 () -> {
                   // 时间均衡：未知邮箱同样执行一次 BCrypt 比对
-                  passwordEncoder.matches(request.password(), DUMMY_BCRYPT_HASH);
+                  passwordEncoder.matches(password, DUMMY_BCRYPT_HASH);
                   return invalidCredentials();
                 });
 
-    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+    if (!passwordEncoder.matches(password, user.getPasswordHash())) {
       auditPublisher.publish(
           new AuditedEvent(
               null, user.getId(), AuditActions.AUTH_LOGIN_FAILED, "user:" + user.getId(), email));

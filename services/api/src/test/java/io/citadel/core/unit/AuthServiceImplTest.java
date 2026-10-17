@@ -28,8 +28,10 @@ import io.citadel.core.repository.RefreshTokenRepository;
 import io.citadel.core.repository.UserRepository;
 import io.citadel.core.repository.WorkspaceMemberRepository;
 import io.citadel.core.repository.WorkspaceRepository;
+import io.citadel.core.security.AuthCryptoService;
 import io.citadel.core.security.JwtService;
 import io.citadel.core.service.impl.AuthServiceImpl;
+import io.citadel.core.testsupport.ClientCrypto;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +66,8 @@ class AuthServiceImplTest {
   @Mock private JwtService jwtService;
   @Mock private AuditEventPublisher auditPublisher;
 
+  private final AuthCryptoService cryptoService = new AuthCryptoService();
+
   private AuthServiceImpl service;
 
   @BeforeEach
@@ -77,7 +81,8 @@ class AuthServiceImplTest {
             passwordEncoder,
             jwtService,
             auditPublisher,
-            PROPERTIES);
+            PROPERTIES,
+            cryptoService);
 
     // 模拟数据库自增主键：save 时回填 id（业务代码依赖 id 非空调用 jwtService）
     when(userRepository.save(any(User.class)))
@@ -134,6 +139,11 @@ class AuthServiceImplTest {
         .build();
   }
 
+  /** 按真实公钥把明文密码封装为信封（与前端 WebCrypto 流程等价）。 */
+  private io.citadel.core.dto.PasswordEnvelope envelope(String plaintext) {
+    return ClientCrypto.encrypt(cryptoService.publicKeyResponse(), plaintext);
+  }
+
   @Test
   @DisplayName("注册：同一事务创建用户 + 工作区 + OWNER 成员关系，并返回令牌")
   void registerCreatesTenantWithOwner() {
@@ -141,7 +151,8 @@ class AuthServiceImplTest {
     when(passwordEncoder.encode("password123")).thenReturn("bcrypt-hash");
 
     AuthResponse response =
-        service.register(new RegisterRequest("Alice@Example.com ", "password123", " Alice "));
+        service.register(
+            new RegisterRequest("Alice@Example.com ", envelope("password123"), " Alice "));
 
     assertThat(response.accessToken()).isEqualTo("access-token");
     assertThat(response.refreshToken()).isEqualTo("refresh-token");
@@ -172,7 +183,8 @@ class AuthServiceImplTest {
 
     assertThatThrownBy(
             () ->
-                service.register(new RegisterRequest("alice@example.com", "password123", "Alice")))
+                service.register(
+                    new RegisterRequest("alice@example.com", envelope("password123"), "Alice")))
         .isInstanceOf(ApiException.class)
         .satisfies(ex -> assertThat(((ApiException) ex).status()).isEqualTo(HttpStatus.CONFLICT));
   }
@@ -182,7 +194,8 @@ class AuthServiceImplTest {
   void loginWithUnknownEmailFails() {
     when(userRepository.findByEmailIgnoreCase("ghost@example.com")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service.login(new LoginRequest("ghost@example.com", "password123")))
+    assertThatThrownBy(
+            () -> service.login(new LoginRequest("ghost@example.com", envelope("password123"))))
         .isInstanceOf(ApiException.class)
         .satisfies(
             ex -> assertThat(((ApiException) ex).status()).isEqualTo(HttpStatus.UNAUTHORIZED));
@@ -195,7 +208,8 @@ class AuthServiceImplTest {
     when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(stored));
     when(passwordEncoder.matches("wrong", "stored-hash")).thenReturn(false);
 
-    assertThatThrownBy(() -> service.login(new LoginRequest("alice@example.com", "wrong")))
+    assertThatThrownBy(
+            () -> service.login(new LoginRequest("alice@example.com", envelope("wrong"))))
         .isInstanceOf(ApiException.class);
 
     verify(auditPublisher)
@@ -214,7 +228,8 @@ class AuthServiceImplTest {
     when(workspaceMemberRepository.findFirstByUserIdOrderByJoinedAtAsc(1L))
         .thenReturn(Optional.of(membership(ws, stored, MemberRole.OWNER)));
 
-    AuthResponse response = service.login(new LoginRequest("alice@example.com", "password123"));
+    AuthResponse response =
+        service.login(new LoginRequest("alice@example.com", envelope("password123")));
 
     assertThat(response.workspace().id()).isEqualTo(10L);
     assertThat(response.workspace().role()).isEqualTo(MemberRole.OWNER);

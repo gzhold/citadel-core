@@ -25,6 +25,37 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/**
+ * 密码信封（应用层加密，防御纵深）：AES-256-GCM 会话密钥经服务端 RSA-OAEP(SHA-256)
+ * 公钥包裹（encryptedKey），密码明文经会话密钥加密（ciphertext + iv）。全 Base64。
+ * 公钥来源：GET /api/v1/auth/crypto/key。TLS 仍是传输安全基础，本机制不替代它。
+ */
+export const passwordEnvelopeSchema = z.object({
+  keyId: z.string(),
+  encryptedKey: z.string(),
+  iv: z.string(),
+  ciphertext: z.string(),
+});
+export type PasswordEnvelope = z.infer<typeof passwordEnvelopeSchema>;
+
+/** 线上请求体：表单收集明文（loginSchema/registerSchema 做 UX 校验），发送前经信封加密。 */
+export const loginRequestSchema = z.object({
+  email: z.email(),
+  password: passwordEnvelopeSchema,
+});
+export const registerRequestSchema = z.object({
+  email: z.email(),
+  password: passwordEnvelopeSchema,
+  displayName: z.string().min(1).max(100),
+});
+
+export const cryptoKeyResponseSchema = z.object({
+  keyId: z.string(),
+  algorithm: z.string(),
+  publicKey: z.string(),
+});
+export type CryptoKeyResponse = z.infer<typeof cryptoKeyResponseSchema>;
+
 // ---- 响应 ----
 
 export const userSchema = z.object({

@@ -2,6 +2,8 @@ package io.citadel.core.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.citadel.core.dto.CryptoKeyResponse;
+import io.citadel.core.testsupport.ClientCrypto;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,8 @@ class AuthFlowIT {
 
   @Autowired private TestRestTemplate restTemplate;
 
+  private CryptoKeyResponse keyCache;
+
   private static final ParameterizedTypeReference<Map<String, Object>> JSON =
       new ParameterizedTypeReference<>() {};
 
@@ -46,11 +50,40 @@ class AuthFlowIT {
     return (Map<String, Object>) body;
   }
 
+  /** 模拟真实客户端：取服务端公钥（后续密码全部信封加密，请求体无明文）。 */
+  @SuppressWarnings("unchecked")
+  private CryptoKeyResponse cryptoKey() {
+    var response =
+        restTemplate.exchange(
+            "/api/v1/auth/crypto/key",
+            HttpMethod.GET,
+            null,
+            new ParameterizedTypeReference<Map<String, Object>>() {});
+    Map<String, Object> body = response.getBody();
+    return new CryptoKeyResponse(
+        (String) body.get("keyId"), (String) body.get("algorithm"), (String) body.get("publicKey"));
+  }
+
   private Map<String, Object> register(String email) {
-    var request = Map.of("email", email, "password", "password123", "displayName", "Alice");
+    var key = cryptoKey();
+    var request =
+        Map.of(
+            "email",
+            email,
+            "password",
+            ClientCrypto.encrypt(key, "password123"),
+            "displayName",
+            "Alice");
     var response = post("/api/v1/auth/register", request);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     return response.getBody();
+  }
+
+  private io.citadel.core.dto.PasswordEnvelope envelope(String plaintext) {
+    if (keyCache == null) {
+      keyCache = cryptoKey();
+    }
+    return ClientCrypto.encrypt(keyCache, plaintext);
   }
 
   /** TestRestTemplate 的 postForEntity 不支持 ParameterizedTypeReference，统一走 exchange。 */
@@ -79,7 +112,7 @@ class AuthFlowIT {
   void loginThenMeRoundtrip() {
     register("me@example.com");
 
-    var login = Map.of("email", "me@example.com", "password", "password123");
+    var login = Map.of("email", "me@example.com", "password", envelope("password123"));
     var loginResponse = post("/api/v1/auth/login", login);
     assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     String accessToken = (String) map(loginResponse.getBody()).get("accessToken");
@@ -111,7 +144,7 @@ class AuthFlowIT {
   void refreshRotatesAndReuseRevokesEverything() {
     register("refresh@example.com");
 
-    var login = Map.of("email", "refresh@example.com", "password", "password123");
+    var login = Map.of("email", "refresh@example.com", "password", envelope("password123"));
     String firstRefresh =
         (String) map(post("/api/v1/auth/login", login).getBody()).get("refreshToken");
 

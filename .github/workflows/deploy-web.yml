@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['apps/web/**', 'packages/api-contract/**']
+    paths: ["apps/web/**", "packages/api-contract/**"]
 
 permissions:
   contents: read

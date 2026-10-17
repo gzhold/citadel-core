@@ -74,6 +74,7 @@ jobs:
             --max-instances=2
             --timeout=60
             --allow-unauthenticated
+            --service-account=citadel-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
       - name: 部署后健康检查
         run: |

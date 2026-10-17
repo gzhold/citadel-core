@@ -56,6 +56,7 @@ jobs:
             --max-instances=2
             --timeout=300
             --allow-unauthenticated
+            --service-account=citadel-runtime@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
             --set-env-vars=SPRING_PROFILES_ACTIVE=prod
             --set-secrets=DATABASE_URL=citadel-db-url:latest,DATABASE_USERNAME=citadel-db-user:latest,DATABASE_PASSWORD=citadel-db-pass:latest,JWT_SECRET=citadel-jwt-secret:latest,CORS_ALLOWED_ORIGINS=citadel-cors-origins:latest
 

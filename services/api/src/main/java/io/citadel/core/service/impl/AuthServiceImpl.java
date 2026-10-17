@@ -124,7 +124,8 @@ public class AuthServiceImpl implements AuthService {
   }
 
   @Override
-  @Transactional
+  // noRollbackFor：登录失败的审计事件必须落库，不能随业务异常回滚
+  @Transactional(noRollbackFor = ApiException.class)
   public AuthResponse login(LoginRequest request) {
     String email = request.email().trim().toLowerCase(Locale.ROOT);
     User user =
@@ -157,7 +158,10 @@ public class AuthServiceImpl implements AuthService {
   }
 
   @Override
-  @Transactional
+  // noRollbackFor（关键安全语义）：重放检测触发的"吊销该用户全部令牌"、过期令牌的
+  // revokedAt 落库与审计事件，都是必须持久化的安全簿记。若随 ApiException 回滚，
+  // 攻击者重放已吊销令牌时连坐吊销不会生效（集成测试 AuthFlowIT 覆盖此场景）。
+  @Transactional(noRollbackFor = ApiException.class)
   public AuthResponse refresh(RefreshRequest request) {
     String hash = jwtService.hashToken(request.refreshToken());
     RefreshToken token =

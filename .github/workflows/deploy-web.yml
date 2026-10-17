@@ -1,0 +1,85 @@
+# 部署 citadel-web（Next.js standalone 容器）到 Cloud Run。
+# 依赖：deploy-api 先落成（本工作流自动探测 citadel-api 服务地址并等待其就绪）。
+# 触发：apps/web 或共享契约变更合入 main；也可手动运行。
+name: deploy-web
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'packages/api-contract/**']
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation
+
+env:
+  REGION: us-central1
+  SERVICE: citadel-web
+  IMAGE: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/citadel/citadel-web
+
+jobs:
+  build-and-deploy:
+    name: build → push → deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Google 认证（WIF，无长期密钥）
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: 安装 gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 等待并获取 citadel-api 地址
+        run: |
+          for i in $(seq 1 30); do
+            API_URL=$(gcloud run services describe citadel-api --region "$REGION" \
+              --format 'value(status.url)' 2>/dev/null)
+            if [ -n "$API_URL" ]; then
+              echo "API_URL=$API_URL" >> "$GITHUB_ENV"
+              echo "citadel-api: $API_URL"
+              exit 0
+            fi
+            echo "waiting for citadel-api... ($i/30)"; sleep 10
+          done
+          echo "citadel-api 尚未部署，请先运行 deploy-api" && exit 1
+
+      # NEXT_PUBLIC_* 在构建期内联，必须作为 build arg 传入
+      - name: 构建镜像
+        run: |
+          docker build -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="$API_URL" \
+            -t "${IMAGE}:${GITHUB_SHA}" .
+
+      - name: 推送 Artifact Registry
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev"
+          docker push "${IMAGE}:${GITHUB_SHA}"
+
+      - name: 部署 Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: citadel-web
+          image: "${IMAGE}:${GITHUB_SHA}"
+          region: us-central1
+          flags: >-
+            --cpu=1
+            --memory=512Mi
+            --min-instances=0
+            --max-instances=2
+            --timeout=60
+            --allow-unauthenticated
+
+      - name: 部署后健康检查
+        run: |
+          url=$(gcloud run services describe citadel-web --region us-central1 --format 'value(status.url)')
+          for i in $(seq 1 12); do
+            if curl -fsS "${url}/api/health" | grep -q '"ok"'; then echo "healthy"; exit 0; fi
+            echo "waiting... ${i}"; sleep 10
+          done
+          echo "service did not become healthy" && exit 1

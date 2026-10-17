@@ -47,7 +47,7 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: citadel-api
-          image: "${IMAGE_BASE}:${GITHUB_SHA}"
+          image: "${{ env.IMAGE_BASE }}:${{ github.sha }}"
           region: us-central1
           flags: >-
             --cpu=1
